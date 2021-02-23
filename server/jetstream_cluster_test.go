@@ -1579,7 +1579,7 @@ func TestJetStreamClusterExtendedStreamInfo(t *testing.T) {
 	}
 
 	// Faster timeout since we loop below checking for condition.
-	js2, err := nc.JetStream(nats.MaxWait(10 * time.Millisecond))
+	js2, err := nc.JetStream(nats.MaxWait(50 * time.Millisecond))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1815,7 +1815,7 @@ func TestJetStreamClusterInterestRetention(t *testing.T) {
 	}
 	m.Ack()
 
-	js, err = nc.JetStream(nats.MaxWait(10 * time.Millisecond))
+	js, err = nc.JetStream(nats.MaxWait(50 * time.Millisecond))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1875,7 +1875,7 @@ func TestJetStreamClusterInterestRetentionWithFilteredConsumers(t *testing.T) {
 		m.Ack()
 	}
 
-	jsq, err := nc.JetStream(nats.MaxWait(10 * time.Millisecond))
+	jsq, err := nc.JetStream(nats.MaxWait(50 * time.Millisecond))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -3123,7 +3123,7 @@ func TestJetStreamClusterRemovePeer(t *testing.T) {
 	}
 
 	// Grab shorter timeout jetstream context.
-	js, err = nc.JetStream(nats.MaxWait(100 * time.Millisecond))
+	js, err = nc.JetStream(nats.MaxWait(50 * time.Millisecond))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -3221,7 +3221,7 @@ func TestJetStreamClusterStreamLeaderStepDown(t *testing.T) {
 	}
 
 	// Grab shorter timeout jetstream context.
-	js, err = nc.JetStream(nats.MaxWait(100 * time.Millisecond))
+	js, err = nc.JetStream(nats.MaxWait(50 * time.Millisecond))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -3318,7 +3318,7 @@ func TestJetStreamClusterRemoveServer(t *testing.T) {
 	c.waitOnStreamLeader("$G", "TEST")
 
 	// Faster timeout since we loop below checking for condition.
-	js, err = nc.JetStream(nats.MaxWait(10 * time.Millisecond))
+	js, err = nc.JetStream(nats.MaxWait(50 * time.Millisecond))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

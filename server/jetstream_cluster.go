@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -116,6 +117,7 @@ type consumerAssignment struct {
 	State   *ConsumerState  `json:"state,omitempty"`
 	// Internal
 	responded bool
+	deleted   bool
 	err       error
 }
 
@@ -490,6 +492,7 @@ func (js *jetStream) setupMetaGroup() error {
 		s.Warnf("Could not start metadata controller: %v", err)
 		return err
 	}
+	n.Campaign()
 
 	c := s.createInternalJetStreamClient()
 	sacc := s.SystemAccount()
@@ -1369,14 +1372,14 @@ func (js *jetStream) applyStreamEntries(mset *stream, ce *CommittedEntry, isReco
 					continue
 				}
 
+				s := js.srv
 				if err := mset.processJetStreamMsg(subject, reply, hdr, msg, lseq, ts); err != nil {
 					if err != errLastSeqMismatch || !isRecovering {
-						js.srv.Debugf("Got error processing JetStream msg: %v", err)
+						s.Debugf("Got error processing JetStream msg: %v", err)
 					}
 					if strings.Contains(err.Error(), "no space left") {
-						s := js.srv
 						s.Errorf("JetStream out of space, will be DISABLED")
-						js.srv.DisableJetStream()
+						s.DisableJetStream()
 						return err
 					}
 				}
@@ -1394,7 +1397,8 @@ func (js *jetStream) applyStreamEntries(mset *stream, ce *CommittedEntry, isReco
 					removed, err = mset.eraseMsg(md.Seq)
 				}
 				if err != nil && !isRecovering {
-					s.Debugf("JetStream cluster failed to delete msg %d from stream %q for account %q: %v", md.Seq, md.Stream, md.Client.serviceAccount(), err)
+					s.Debugf("JetStream cluster failed to delete msg %d from stream %q for account %q: %v",
+						md.Seq, md.Stream, md.Client.serviceAccount(), err)
 				}
 
 				js.mu.RLock()
@@ -3216,7 +3220,7 @@ func (s *Server) jsClusteredConsumerDeleteRequest(ci *ClientInfo, acc *Account, 
 		s.sendAPIErrResponse(ci, acc, subject, reply, string(rmsg), s.jsonResponse(&resp))
 		return
 	}
-
+	oca.deleted = true
 	ca := &consumerAssignment{Group: oca.Group, Stream: stream, Name: consumer, Config: oca.Config, Subject: subject, Reply: reply, Client: ci}
 	cc.meta.Propose(encodeDeleteConsumerAssignment(ca))
 }
@@ -3343,10 +3347,13 @@ func (s *Server) jsClusteredConsumerRequest(ci *ClientInfo, acc *Account, subjec
 		}
 	} else {
 		oname = cfg.Durable
-		if sa.consumers[oname] != nil {
-			resp.Error = jsError(ErrJetStreamConsumerAlreadyUsed)
-			s.sendAPIErrResponse(ci, acc, subject, reply, string(rmsg), s.jsonResponse(&resp))
-			return
+		if ca := sa.consumers[oname]; ca != nil && !ca.deleted {
+			// This can be ok if delivery subject update.
+			if !reflect.DeepEqual(cfg, ca.Config) && !configsEqualSansDelivery(*cfg, *ca.Config) {
+				resp.Error = jsError(ErrJetStreamConsumerAlreadyUsed)
+				s.sendAPIErrResponse(ci, acc, subject, reply, string(rmsg), s.jsonResponse(&resp))
+				return
+			}
 		}
 	}
 
